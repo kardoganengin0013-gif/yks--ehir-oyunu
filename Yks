@@ -1,0 +1,390 @@
+```html
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YKS Metropolis - Kişisel Şehir Simülasyonu</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#090d16',
+                            panel: '#111827',
+                            card: '#1f2937',
+                            accent: '#3b82f6',
+                            gold: '#f59e0b',
+                            cyan: '#06b6d4',
+                            purple: '#a855f7',
+                            emerald: '#10b981',
+                            rose: '#f43f5e'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #060911;
+            color: #f3f4f6;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+        }
+
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .grid-tile {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            aspect-ratio: 1;
+        }
+
+        .grid-tile:hover {
+            transform: translateY(-4px) scale(1.03);
+            box-shadow: 0 12px 30px -5px rgba(59, 130, 246, 0.35);
+        }
+
+        .pulse-glow {
+            animation: pulseGlow 2s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.2); }
+            100% { box-shadow: 0 0 30px rgba(6, 182, 212, 0.6); }
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-blue-500 selection:text-white">
+
+    <!-- HEADER / TOP NAV BAR -->
+    <header class="glass-panel sticky top-0 z-50 border-b border-gray-800/80 px-4 py-3 shadow-xl">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
+            
+            <!-- Brand & Player Progression -->
+            <div class="flex items-center gap-3.5">
+                <div class="relative">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <i class="fa-solid fa-city text-2xl text-white"></i>
+                    </div>
+                    <span class="absolute -bottom-1 -right-1 flex h-3.5 w-3.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+                    </span>
+                </div>
+                
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-extrabold text-lg tracking-tight text-white">
+                            YKS METROPOLİS
+                        </h1>
+                        <span id="player-lvl-badge" class="bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-400 text-xs px-2.5 py-0.5 rounded-full border border-blue-500/30 font-bold">
+                            Lvl 1 Belediye Başkanı
+                        </span>
+                    </div>
+                    <!-- XP Bar -->
+                    <div class="flex items-center gap-2 mt-1">
+                        <div class="w-36 sm:w-48 bg-gray-800 h-2.5 rounded-full overflow-hidden border border-gray-700/60 p-0.5">
+                            <div id="xp-bar" class="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 h-full rounded-full w-0 transition-all duration-500"></div>
+                        </div>
+                        <span id="xp-text" class="text-[10px] font-semibold text-gray-400">0/100 XP</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resource Counter Bar -->
+            <div class="flex flex-wrap items-center gap-2 sm:gap-4 bg-gray-950/70 px-4 py-2 rounded-2xl border border-gray-800/80 shadow-inner">
+                <!-- Odak Gücü -->
+                <div class="flex items-center gap-2.5 px-2" title="Pomodoro ile kazanılır. Binalar için harcanır.">
+                    <div class="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Odak</div>
+                        <div id="res-focus" class="font-extrabold text-sm text-cyan-300">50</div>
+                    </div>
+                </div>
+
+                <div class="h-6 w-px bg-gray-800"></div>
+
+                <!-- Altın -->
+                <div class="flex items-center gap-2.5 px-2" title="Soru çözerek kazanılır.">
+                    <div class="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                        <i class="fa-solid fa-coins"></i>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Altın</div>
+                        <div id="res-gold" class="font-extrabold text-sm text-amber-300">100</div>
+                    </div>
+                </div>
+
+                <div class="h-6 w-px bg-gray-800"></div>
+
+                <!-- Elmas -->
+                <div class="flex items-center gap-2.5 px-2" title="Deneme ve görevlerle kazanılır. Özel binalar açar.">
+                    <div class="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                        <i class="fa-solid fa-gem"></i>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Elmas</div>
+                        <div id="res-gems" class="font-extrabold text-sm text-purple-300">5</div>
+                    </div>
+                </div>
+
+                <div class="h-6 w-px bg-gray-800"></div>
+
+                <!-- Şehir Mutluluğu -->
+                <div class="flex items-center gap-2.5 px-2" title="Duzenli çalışma verimini artırır.">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <i id="happy-icon" class="fa-solid fa-face-smile"></i>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Mutluluk</div>
+                        <div id="res-happiness" class="font-extrabold text-sm text-emerald-300">%100</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Utility Buttons -->
+            <div class="flex items-center gap-2">
+                <button onclick="toggleAudio()" id="btn-audio-toggle" class="p-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-400 hover:text-white transition" title="Ses Efektlerini Aç/Kapat">
+                    <i id="icon-audio" class="fa-solid fa-volume-high"></i>
+                </button>
+                <button onclick="resetGame()" class="p-2.5 rounded-xl bg-gray-900 hover:bg-red-950/40 border border-gray-800 hover:border-red-800/40 text-gray-400 hover:text-red-400 transition" title="Şehri Sıfırla">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <main class="max-w-7xl mx-auto w-full p-4 sm:p-6 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- LEFT COLUMN: WORKSTATION (POMODORO & QUESTION TRACKER) -->
+        <section class="lg:col-span-4 flex flex-col gap-6">
+            
+            <!-- POMODORO TIMER PANEL -->
+            <div class="glass-panel p-6 rounded-3xl shadow-2xl relative overflow-hidden flex flex-col items-center">
+                <div class="absolute -right-8 -top-8 text-gray-800/20 text-9xl pointer-events-none select-none">
+                    <i class="fa-solid fa-stopwatch"></i>
+                </div>
+
+                <div class="w-full flex items-center justify-between mb-4">
+                    <h2 class="text-base font-bold text-gray-200 flex items-center gap-2">
+                        <i class="fa-solid fa-fire text-amber-500"></i> Odak İstatistiği
+                    </h2>
+                    <span id="timer-mode-tag" class="text-[10px] uppercase font-extrabold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                        25 Dk Çalışma
+                    </span>
+                </div>
+
+                <!-- Timer Ring Display -->
+                <div class="relative w-52 h-52 my-3 flex items-center justify-center">
+                    <svg class="w-full h-full transform -rotate-90">
+                        <circle cx="104" cy="104" r="92" stroke="currentColor" stroke-width="10" class="text-gray-800/80" fill="transparent"/>
+                        <circle id="timer-progress" cx="104" cy="104" r="92" stroke="currentColor" stroke-width="10" 
+                                class="text-cyan-500 transition-all duration-1000" fill="transparent" 
+                                stroke-dasharray="578" stroke-dashoffset="0" stroke-linecap="round"/>
+                    </svg>
+                    <div class="absolute flex flex-col items-center">
+                        <span id="timer-display" class="text-5xl font-black tracking-tighter text-white">25:00</span>
+                        <span class="text-xs mt-1 text-gray-400 font-medium">Pomodoro Döngüsü</span>
+                    </div>
+                </div>
+
+                <!-- Timer Controls -->
+                <div class="flex gap-3 mt-4 w-full">
+                    <button id="btn-timer-start" onclick="toggleTimer()" class="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold py-3 px-4 rounded-2xl shadow-lg shadow-blue-600/30 transition active:scale-95 flex items-center justify-center gap-2 text-sm">
+                        <i class="fa-solid fa-play"></i> Başlat
+                    </button>
+                    <button onclick="resetTimer()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-4 py-3 rounded-2xl transition border border-gray-700 flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-rotate-right"></i>
+                    </button>
+                </div>
+
+                <!-- Reward info -->
+                <div class="text-[11px] text-gray-400 mt-4 text-center bg-gray-900/60 px-3 py-2 rounded-xl border border-gray-800/60 w-full">
+                    *Her tamamlanan Pomodoro: <b class="text-cyan-300">+25 Odak</b> &amp; <b class="text-amber-300">+10 Altın</b>
+                </div>
+            </div>
+
+            <!-- QUESTION TRACKER PANEL -->
+            <div class="glass-panel p-6 rounded-3xl shadow-2xl">
+                <h2 class="text-base font-bold text-gray-200 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-amber-400"></i> Soru Çözüm Girişi
+                </h2>
+                <p class="text-xs text-gray-400 mb-4">Çözdüğün soru sayısını girerek şehrine bütçe aktar:</p>
+
+                <div class="flex gap-2">
+                    <div class="relative w-full">
+                        <input type="number" id="input-questions" min="1" placeholder="Çözülen soru sayısı..." 
+                               class="bg-gray-950 border border-gray-800 text-white rounded-2xl px-4 py-3 w-full focus:outline-none focus:border-amber-500 text-sm font-semibold placeholder:text-gray-600">
+                    </div>
+                    <button onclick="addQuestions()" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold px-6 py-3 rounded-2xl transition shadow-lg shadow-amber-500/20 active:scale-95 text-sm whitespace-nowrap flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i> Ekle
+                    </button>
+                </div>
+
+                <!-- Daily Question Stat Badge -->
+                <div class="mt-4 flex items-center justify-between text-xs text-gray-400 bg-gray-900/40 px-3 py-2.5 rounded-xl border border-gray-800/40">
+                    <span>Bugün Çözülen Toplam:</span>
+                    <span id="stat-daily-questions" class="font-extrabold text-amber-300 text-sm">0 Soru</span>
+                </div>
+            </div>
+
+            <!-- DAILY QUESTS & ACHIEVEMENTS -->
+            <div class="glass-panel p-6 rounded-3xl shadow-2xl flex-1 flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-base font-bold text-gray-200 flex items-center gap-2">
+                        <i class="fa-solid fa-scroll text-purple-400"></i> Belediye Görevleri
+                    </h2>
+                    <span class="text-[10px] text-purple-300 font-bold bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">Günlük</span>
+                </div>
+
+                <div id="quest-list" class="space-y-3 flex-1 overflow-y-auto max-h-64 pr-1">
+                    <!-- Dynamic quests via JS -->
+                </div>
+            </div>
+
+        </section>
+
+        <!-- RIGHT COLUMN: CITY MAP & SHOP CATALOG -->
+        <section class="lg:col-span-8 flex flex-col gap-6">
+            
+            <!-- INTERACTIVE TOWN MAP GRID -->
+            <div class="glass-panel p-6 rounded-3xl shadow-2xl relative">
+                <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
+                    <div>
+                        <h2 class="text-lg font-extrabold text-white flex items-center gap-2 tracking-tight">
+                            <i class="fa-solid fa-map-location-dot text-emerald-400"></i> Şehir İmar Planı (4x4 Grid)
+                        </h2>
+                        <p class="text-xs text-gray-400">Haritadaki parsellere tıklayarak binalarını inşa et veya yönet.</p>
+                    </div>
+                    <div id="city-stats-badge" class="bg-gray-950/80 border border-gray-800 text-xs px-3.5 py-2 rounded-2xl text-gray-300 font-semibold flex items-center gap-3">
+                        <span>Nüfus: <strong id="res-pop" class="text-emerald-400">0</strong></span>
+                        <span class="text-gray-700">|</span>
+                        <span>Bina: <strong id="res-buildings-count" class="text-blue-400">0</strong>/16</span>
+                    </div>
+                </div>
+
+                <!-- 4x4 CITY GRID (16 PARCELS) -->
+                <div id="city-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                    <!-- 16 Tiles generated by JS -->
+                </div>
+            </div>
+
+            <!-- BUILDING ARCHITECTURE CATALOG -->
+            <div class="glass-panel p-6 rounded-3xl shadow-2xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-base font-bold text-gray-200 flex items-center gap-2">
+                        <i class="fa-solid fa-store text-blue-400"></i> Mimarlık Kataloğu &amp; Mağaza
+                    </h2>
+                    <span id="selected-building-status" class="text-xs font-semibold text-blue-400 hidden">
+                        *İnşa etmek için boş parsele tıkla
+                    </span>
+                </div>
+
+                <div id="shop-catalog" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+                    <!-- Dynamic Building Cards -->
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- NOTIFICATION TOAST POPUP -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 glass-panel border-l-4 border-emerald-500 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3.5 max-w-sm">
+        <div id="toast-icon-bg" class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <i id="toast-icon" class="fa-solid fa-circle-check text-lg"></i>
+        </div>
+        <div>
+            <div id="toast-title" class="font-extrabold text-sm text-white">İşlem Başarılı</div>
+            <div id="toast-msg" class="text-xs text-gray-300">Detay mesajı buraya gelecek.</div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT GAME ENGINE -->
+    <script>
+        // --- GAME STATE DATA ---
+        let gameState = {
+            level: 1,
+            xp: 0,
+            xpNext: 100,
+            focus: 50,
+            gold: 100,
+            gems: 5,
+            happiness: 100,
+            population: 0,
+            dailyQuestions: 0,
+            soundEnabled: true,
+            grid: Array(16).fill(null), // 16 Parcels for 4x4 grid
+            selectedBuildingId: null,
+            quests: [
+                { id: 1, text: "50 Soru Çöz", target: 50, current: 0, reward: { gold: 50, xp: 25 }, completed: false },
+                { id: 2, text: "2 Pomodoro Tamamla", target: 2, current: 0, reward: { gems: 3, focus: 30 }, completed: false },
+                { id: 3, text: "İlk Binanı İnşa Et", target: 1, current: 0, reward: { gold: 100, gems: 5 }, completed: false },
+                { id: 4, text: "Şehir Nüfusunu 100 Yap", target: 100, current: 0, reward: { gems: 10, xp: 50 }, completed: false }
+            ]
+        };
+
+        // --- BUILDINGS CATALOG ---
+        const BUILDINGS = [
+            {
+                id: 'library',
+                name: 'Halk Kütüphanesi',
+                icon: 'fa-book-open',
+                color: 'text-amber-400',
+                cost: { focus: 20, gold: 50 },
+                pop: 20,
+                income: { gold: 3 }, // Every 10 seconds
+                desc: 'Öğrenciler için çalışma ortamı. Düzenli Altın kazandırır.'
+            },
+            {
+                id: 'powerplant',
+                name: 'Enerji Santrali',
+                icon: 'fa-solar-panel',
+                color: 'text-cyan-400',
+                cost: { focus: 40, gold: 100 },
+                pop: 10,
+                income: { focus: 2 },
+                desc: 'Şehre enerji sağlar. Pasif Odak Gücü üretir.'
+            },
+            {
+                id: 'academy',
+                name: 'YKS Akademisi',
+                icon: 'fa-graduation-cap',
+          
